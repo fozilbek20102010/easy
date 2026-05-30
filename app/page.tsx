@@ -6,171 +6,185 @@ interface Todo {
   title: string;
   description: string;
   done: boolean;
-  priority: "yuqori" | "o'rta" | "past";
-  createdAt: string;
+  priority: string;
+  created_at: string;
 }
 
 export default function Home() {
+  const [token, setToken] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
   const [todos, setTodos] = useState<Todo[]>([]);
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
-  const [priority, setPriority] = useState<"yuqori" | "o'rta" | "past">("o'rta");
-  const [filter, setFilter] = useState<"all" | "active" | "done">("all");
+  const [priority, setPriority] = useState("o'rta");
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authUser, setAuthUser] = useState("");
+  const [authPass, setAuthPass] = useState("");
+  const [error, setError] = useState("");
   const [dark, setDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("todos-next") || "[]");
-    const theme = localStorage.getItem("theme-next") === "dark";
-    setTodos(saved);
-    setDark(theme);
+    const t = localStorage.getItem("token");
+    const u = localStorage.getItem("username");
+    const th = localStorage.getItem("theme-next") === "dark";
+    if (t) { setToken(t); setUsername(u || ""); }
+    setDark(th);
     setMounted(true);
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
-    localStorage.setItem("todos-next", JSON.stringify(todos));
-  }, [todos, mounted]);
-
-  useEffect(() => {
-    if (!mounted) return;
-    localStorage.setItem("theme-next", dark ? "dark" : "light");
     document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("theme-next", dark ? "dark" : "light");
   }, [dark, mounted]);
 
-  function add() {
+  useEffect(() => {
+    if (token) fetchTodos();
+  }, [token]);
+
+  async function fetchTodos() {
+    const res = await fetch("/api/todos", { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
+    setTodos(Array.isArray(data) ? data : []);
+  }
+
+  async function auth() {
+    setError("");
+    const res = await fetch(`/api/auth/${authMode}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: authUser, password: authPass }),
+    });
+    const data = await res.json();
+    if (data.error) return setError(data.error);
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("username", data.username);
+    setToken(data.token);
+    setUsername(data.username);
+  }
+
+  async function addTodo() {
     if (!title.trim()) return;
-    setTodos([{ id: Date.now(), title, description: desc, done: false, priority, createdAt: new Date().toLocaleDateString("uz-UZ") }, ...todos]);
-    setTitle("");
-    setDesc("");
-    setPriority("o'rta");
+    const res = await fetch("/api/todos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ title, description: desc, priority }),
+    });
+    const data = await res.json();
+    setTodos([data, ...todos]);
+    setTitle(""); setDesc(""); setPriority("o'rta");
   }
 
-  function toggle(id: number) {
-    setTodos(todos.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  async function toggleTodo(id: number, done: boolean) {
+    const res = await fetch("/api/todos", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id, done: !done }),
+    });
+    const data = await res.json();
+    setTodos(todos.map(t => t.id === id ? data : t));
   }
 
-  function remove(id: number) {
+  async function deleteTodo(id: number) {
+    await fetch("/api/todos", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id }),
+    });
     setTodos(todos.filter(t => t.id !== id));
   }
 
-  const filtered = todos.filter(t =>
-    filter === "all" ? true : filter === "done" ? t.done : !t.done
-  );
-
-  const remaining = todos.filter(t => !t.done).length;
-  const done = todos.filter(t => t.done).length;
-
-  const priorityColor: Record<string, string> = {
-    "yuqori": "bg-red-100 text-red-600",
-    "o'rta": "bg-yellow-100 text-yellow-600",
-    "past": "bg-green-100 text-green-600",
-  };
+  function logout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    setToken(null); setUsername(""); setTodos([]);
+  }
 
   const priorityDot: Record<string, string> = {
-    "yuqori": "bg-red-500",
-    "o'rta": "bg-yellow-500",
-    "past": "bg-green-500",
+    "yuqori": "bg-red-500", "o'rta": "bg-yellow-500", "past": "bg-green-500"
   };
 
   if (!mounted) return null;
 
-  return (
-    <main className={`min-h-screen transition-colors duration-300 ${dark ? "bg-gray-950" : "bg-gradient-to-br from-violet-50 via-indigo-50 to-blue-100"}`}>
-      <div className="max-w-lg mx-auto px-4 py-10">
-
+  if (!token) return (
+    <main className={`min-h-screen flex items-center justify-center ${dark ? "bg-gray-950" : "bg-gradient-to-br from-violet-50 to-indigo-100"}`}>
+      <div className={`w-full max-w-sm p-8 rounded-2xl shadow-xl ${dark ? "bg-gray-900" : "bg-white"}`}>
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className={`text-3xl font-bold tracking-tight ${dark ? "text-white" : "text-indigo-900"}`}>
-              ✅ Vazifalar
-            </h1>
-            <p className={`text-sm mt-1 ${dark ? "text-gray-400" : "text-indigo-400"}`}>
-              {remaining} ta qoldi · {done} ta bajarildi
-            </p>
-          </div>
-          <button onClick={() => setDark(!dark)}
-            className={`w-11 h-11 rounded-full text-xl flex items-center justify-center shadow transition-all ${dark ? "bg-gray-800 hover:bg-gray-700" : "bg-white hover:bg-indigo-50"}`}>
+          <h1 className={`text-2xl font-bold ${dark ? "text-white" : "text-indigo-900"}`}>
+            {authMode === "login" ? "🔐 Kirish" : "📝 Ro'yxat"}
+          </h1>
+          <button onClick={() => setDark(!dark)} className={`w-9 h-9 rounded-full text-lg flex items-center justify-center ${dark ? "bg-gray-800" : "bg-indigo-50"}`}>
             {dark ? "☀️" : "🌑"}
           </button>
         </div>
+        <input value={authUser} onChange={e => setAuthUser(e.target.value)}
+          placeholder="Username" className={`w-full px-4 py-3 rounded-xl border mb-3 text-sm outline-none ${dark ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500" : "bg-indigo-50 border-transparent text-gray-800"}`} />
+        <input value={authPass} onChange={e => setAuthPass(e.target.value)} type="password"
+          onKeyDown={e => e.key === "Enter" && auth()}
+          placeholder="Parol" className={`w-full px-4 py-3 rounded-xl border mb-3 text-sm outline-none ${dark ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500" : "bg-indigo-50 border-transparent text-gray-800"}`} />
+        {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
+        <button onClick={auth} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl mb-3">
+          {authMode === "login" ? "Kirish" : "Ro'yxatdan o'tish"}
+        </button>
+        <p className={`text-center text-sm ${dark ? "text-gray-400" : "text-gray-500"}`}>
+          {authMode === "login" ? "Hisob yo'qmi? " : "Hisob bormi? "}
+          <button onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setError(""); }}
+            className="text-indigo-500 font-semibold">
+            {authMode === "login" ? "Ro'yxat" : "Kirish"}
+          </button>
+        </p>
+      </div>
+    </main>
+  );
 
-        {todos.length > 0 && (
-          <div className={`w-full h-2 rounded-full mb-6 overflow-hidden ${dark ? "bg-gray-800" : "bg-indigo-100"}`}>
-            <div className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-              style={{ width: `${(done / todos.length) * 100}%` }} />
+  return (
+    <main className={`min-h-screen ${dark ? "bg-gray-950" : "bg-gradient-to-br from-violet-50 to-indigo-100"}`}>
+      <div className="max-w-lg mx-auto px-4 py-10">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className={`text-2xl font-bold ${dark ? "text-white" : "text-indigo-900"}`}>👋 {username}</h1>
+            <p className={`text-sm ${dark ? "text-gray-400" : "text-indigo-400"}`}>{todos.filter(t => !t.done).length} ta bajarilmagan</p>
           </div>
-        )}
+          <div className="flex gap-2">
+            <button onClick={() => setDark(!dark)} className={`w-10 h-10 rounded-full text-lg flex items-center justify-center ${dark ? "bg-gray-800" : "bg-white shadow"}`}>
+              {dark ? "☀️" : "🌑"}
+            </button>
+            <button onClick={logout} className={`w-10 h-10 rounded-full text-lg flex items-center justify-center ${dark ? "bg-gray-800" : "bg-white shadow"}`}>🚪</button>
+          </div>
+        </div>
 
         <div className={`rounded-2xl p-5 mb-5 shadow-lg ${dark ? "bg-gray-900" : "bg-white"}`}>
-          <input value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
-            placeholder="Vazifa nomi..."
-            className={`w-full px-4 py-3 rounded-xl border mb-3 text-sm outline-none transition ${dark ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:border-indigo-500" : "bg-indigo-50 border-transparent text-gray-800 focus:border-indigo-300"}`} />
-          <input value={desc} onChange={e => setDesc(e.target.value)} onKeyDown={e => e.key === "Enter" && add()}
-            placeholder="Tavsif (ixtiyoriy)..."
-            className={`w-full px-4 py-3 rounded-xl border mb-3 text-sm outline-none transition ${dark ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500 focus:border-indigo-500" : "bg-indigo-50 border-transparent text-gray-800 focus:border-indigo-300"}`} />
-
+          <input value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && addTodo()}
+            placeholder="Vazifa nomi..." className={`w-full px-4 py-3 rounded-xl border mb-3 text-sm outline-none ${dark ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500" : "bg-indigo-50 border-transparent text-gray-800"}`} />
+          <input value={desc} onChange={e => setDesc(e.target.value)}
+            placeholder="Tavsif (ixtiyoriy)..." className={`w-full px-4 py-3 rounded-xl border mb-3 text-sm outline-none ${dark ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500" : "bg-indigo-50 border-transparent text-gray-800"}`} />
           <div className="flex gap-2 mb-3">
-            {(["yuqori", "o'rta", "past"] as const).map(p => (
+            {["yuqori", "o'rta", "past"].map(p => (
               <button key={p} onClick={() => setPriority(p)}
-                className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${priority === p ? priorityColor[p] + " ring-2 ring-offset-1 ring-current" : dark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-400"}`}>
+                className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${priority === p ? (p === "yuqori" ? "bg-red-100 text-red-600" : p === "o'rta" ? "bg-yellow-100 text-yellow-600" : "bg-green-100 text-green-600") : dark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-400"}`}>
                 {p === "yuqori" ? "🔴 Yuqori" : p === "o'rta" ? "🟡 O'rta" : "🟢 Past"}
               </button>
             ))}
           </div>
-
-          <button onClick={add}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-semibold rounded-xl transition-all">
-            + Qo'shish
-          </button>
-        </div>
-
-        <div className="flex gap-2 mb-4">
-          {(["all", "active", "done"] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${filter === f ? "bg-indigo-600 text-white" : dark ? "bg-gray-900 text-gray-400 hover:bg-gray-800" : "bg-white text-gray-400 hover:bg-indigo-50"}`}>
-              {f === "all" ? "Hammasi" : f === "active" ? "Bajarilmagan" : "Bajarilgan"}
-            </button>
-          ))}
+          <button onClick={addTodo} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl">+ Qo'shish</button>
         </div>
 
         <div className="flex flex-col gap-3">
-          {filtered.length === 0 && (
-            <div className={`text-center py-12 ${dark ? "text-gray-600" : "text-indigo-200"}`}>
-              <p className="text-4xl mb-2">📋</p>
-              <p className="text-sm">Hozircha bu yerda hech narsa yo'q</p>
-            </div>
-          )}
-          {filtered.map(t => (
-            <div key={t.id}
-              className={`rounded-2xl p-4 flex items-start gap-3 shadow-sm transition-all ${t.done ? "opacity-50" : ""} ${dark ? "bg-gray-900" : "bg-white"}`}>
-              <input type="checkbox" checked={t.done} onChange={() => toggle(t.id)}
-                className="mt-1 w-5 h-5 accent-indigo-600 cursor-pointer flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${priorityDot[t.priority]}`} />
-                  <p className={`font-semibold text-sm ${t.done ? "line-through" : ""} ${dark ? "text-white" : "text-gray-800"}`}>
-                    {t.title}
-                  </p>
+          {todos.map(t => (
+            <div key={t.id} className={`rounded-2xl p-4 flex items-start gap-3 shadow-sm ${t.done ? "opacity-50" : ""} ${dark ? "bg-gray-900" : "bg-white"}`}>
+              <input type="checkbox" checked={t.done} onChange={() => toggleTodo(t.id, t.done)} className="mt-1 w-5 h-5 accent-indigo-600 cursor-pointer flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${priorityDot[t.priority] || "bg-gray-400"}`} />
+                  <p className={`font-semibold text-sm ${t.done ? "line-through" : ""} ${dark ? "text-white" : "text-gray-800"}`}>{t.title}</p>
                 </div>
-                {t.description && (
-                  <p className={`text-xs ml-4 ${dark ? "text-gray-500" : "text-gray-400"}`}>{t.description}</p>
-                )}
-                <p className={`text-xs ml-4 mt-1 ${dark ? "text-gray-700" : "text-gray-300"}`}>{t.createdAt}</p>
+                {t.description && <p className={`text-xs ml-4 mt-0.5 ${dark ? "text-gray-500" : "text-gray-400"}`}>{t.description}</p>}
               </div>
-              <button onClick={() => remove(t.id)}
-                className={`text-sm px-2 py-1 rounded-lg transition ${dark ? "text-gray-600 hover:text-red-400 hover:bg-gray-800" : "text-gray-300 hover:text-red-400 hover:bg-red-50"}`}>
-                ✕
-              </button>
+              <button onClick={() => deleteTodo(t.id)} className={`text-sm px-2 py-1 rounded-lg ${dark ? "text-gray-600 hover:text-red-400" : "text-gray-300 hover:text-red-400"}`}>✕</button>
             </div>
           ))}
         </div>
-
-        {todos.some(t => t.done) && (
-          <button onClick={() => setTodos(todos.filter(t => !t.done))}
-            className={`mt-5 w-full py-2 text-xs rounded-xl transition ${dark ? "text-gray-600 hover:text-red-400 hover:bg-gray-900" : "text-gray-300 hover:text-red-400 hover:bg-white"}`}>
-            🗑 Bajarilganlarni o'chirish
-          </button>
-        )}
       </div>
     </main>
   );

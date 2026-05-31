@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { supabase } from "@/lib/supabase";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
@@ -11,16 +11,14 @@ export async function POST(req: NextRequest) {
 
   const hashed = await bcrypt.hash(password, 10);
 
-  const { data, error } = await supabase
-    .from("users")
-    .insert({ username, password: hashed })
-    .select()
-    .single();
+  try {
+    const user = await prisma.user.create({
+      data: { username, password: hashed },
+    });
 
-  if (error)
+    const token = jwt.sign({ id: user.id, username }, process.env.JWT_SECRET!, { expiresIn: "7d" });
+    return NextResponse.json({ token, username });
+  } catch {
     return NextResponse.json({ error: "Bu username band" }, { status: 400 });
-
-  const token = jwt.sign({ id: data.id, username }, process.env.JWT_SECRET!, { expiresIn: "7d" });
-
-  return NextResponse.json({ token, username });
+  }
 }

@@ -7,7 +7,7 @@ interface Todo {
   description: string;
   done: boolean;
   priority: string;
-  created_at: string;
+  createdAt: string;
 }
 
 export default function Home() {

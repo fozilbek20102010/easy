@@ -16,7 +16,7 @@ export default function Home() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
-  const [priority, setPriority] = useState("o'rta");
+  const [priority, setPriority] = useState("orta");
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authUser, setAuthUser] = useState("");
   const [authPass, setAuthPass] = useState("");
@@ -73,7 +73,7 @@ export default function Home() {
     });
     const data = await res.json();
     setTodos([data, ...todos]);
-    setTitle(""); setDesc(""); setPriority("o'rta");
+    setTitle(""); setDesc(""); setPriority("orta");
   }
 
   async function toggleTodo(id: number, done: boolean) {
@@ -102,7 +102,9 @@ export default function Home() {
   }
 
   const priorityDot: Record<string, string> = {
-    "yuqori": "bg-red-500", "o'rta": "bg-yellow-500", "past": "bg-green-500"
+    "yuqori": "bg-red-500",
+    "orta": "bg-yellow-500",
+    "past": "bg-green-500"
   };
 
   if (!mounted) return null;
@@ -160,10 +162,10 @@ export default function Home() {
           <input value={desc} onChange={e => setDesc(e.target.value)}
             placeholder="Tavsif (ixtiyoriy)..." className={`w-full px-4 py-3 rounded-xl border mb-3 text-sm outline-none ${dark ? "bg-gray-800 border-gray-700 text-white placeholder-gray-500" : "bg-indigo-50 border-transparent text-gray-800"}`} />
           <div className="flex gap-2 mb-3">
-            {["yuqori", "o'rta", "past"].map(p => (
+            {["yuqori", "orta", "past"].map(p => (
               <button key={p} onClick={() => setPriority(p)}
-                className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${priority === p ? (p === "yuqori" ? "bg-red-100 text-red-600" : p === "o'rta" ? "bg-yellow-100 text-yellow-600" : "bg-green-100 text-green-600") : dark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-400"}`}>
-                {p === "yuqori" ? "🔴 Yuqori" : p === "o'rta" ? "🟡 O'rta" : "🟢 Past"}
+                className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${priority === p ? (p === "yuqori" ? "bg-red-100 text-red-600" : p === "orta" ? "bg-yellow-100 text-yellow-600" : "bg-green-100 text-green-600") : dark ? "bg-gray-800 text-gray-400" : "bg-gray-100 text-gray-400"}`}>
+                {p === "yuqori" ? "🔴 Yuqori" : p === "orta" ? "🟡 O'rta" : "🟢 Past"}
               </button>
             ))}
           </div>
